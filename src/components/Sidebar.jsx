@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Terminal,
@@ -37,7 +38,7 @@ export default function Sidebar({
   onOpenDocs = () => {},
   isActionLoading = false
 }) {
-  const [showServerMenu, setShowServerMenu] = React.useState(false);
+  const [showServerMenu, setShowServerMenu] = useState(false);
 
   const navItems = [
     { id: 'dashboard', label: '概要 (Overview)', icon: LayoutDashboard, badge: null },
