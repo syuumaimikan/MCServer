@@ -1,8 +1,15 @@
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
 import os from 'os';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import {
   getAvailableVersions,
@@ -610,13 +617,6 @@ app.post('/api/servers/:id/crash-repair', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-import { spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
