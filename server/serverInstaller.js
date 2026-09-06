@@ -146,6 +146,119 @@ export async function getAvailableVersions(type = 'fabric') {
 }
 
 /**
+ * Helper to fetch latest NeoForge installer version from maven metadata
+ */
+export async function getNeoForgeVersion(mcVersion) {
+  try {
+    const res = await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml');
+    const text = await res.text();
+    const prefix = mcVersion.replace(/^1\./, '');
+    const regex = new RegExp(`<version>(${prefix.replace('.', '\\.')}\\.[^<]+)<\\/version>`, 'g');
+    const matches = [...text.matchAll(regex)].map(m => m[1]);
+    if (matches.length > 0) return matches[matches.length - 1];
+  } catch (_) {}
+  const fallback = {
+    '1.21.4': '21.4.157',
+    '1.21.3': '21.3.56',
+    '1.21.1': '21.1.77',
+    '1.20.6': '20.6.119',
+    '1.20.4': '20.4.167'
+  };
+  return fallback[mcVersion] || (mcVersion.startsWith('2') ? mcVersion : '21.1.77');
+}
+
+/**
+ * Execute Java installer with --installServer argument
+ */
+export function runJavaInstaller(javaPath = 'java', jarPath, cwd, onLog = () => {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(javaPath, ['-jar', jarPath, '--installServer'], {
+      cwd,
+      shell: false
+    });
+
+    let stderr = '';
+    child.stdout.on('data', (d) => {
+      const line = d.toString('utf8');
+      onLog(line.trim());
+    });
+    child.stderr.on('data', (d) => {
+      const line = d.toString('utf8');
+      stderr += line;
+      onLog(line.trim());
+    });
+    child.on('error', (err) => reject(err));
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Server installer exited with code ${code}: ${stderr || 'Unknown installer error'}`));
+      }
+    });
+  });
+}
+
+/**
+ * Resolves how to launch the Minecraft server (argsFile vs jar)
+ */
+export function findServerLaunchTarget(serverDir) {
+  const isWin = process.platform === 'win32';
+  const targetArgsName = isWin ? 'win_args.txt' : 'unix_args.txt';
+
+  // 1. Check for NeoForge / modern Forge args files in libraries/
+  const libDir = path.join(serverDir, 'libraries');
+  if (fs.existsSync(libDir)) {
+    const findArgsFile = (dir) => {
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const res = findArgsFile(full);
+            if (res) return res;
+          } else if (entry.name === targetArgsName) {
+            return full;
+          }
+        }
+      } catch (_) {}
+      return null;
+    };
+
+    const foundArgs = findArgsFile(libDir);
+    if (foundArgs) {
+      const relPath = path.relative(serverDir, foundArgs).replace(/\\/g, '/');
+      return {
+        type: 'argsFile',
+        target: relPath
+      };
+    }
+  }
+
+  // 2. Check for legacy Forge server jar (e.g. forge-1.16.5-*.jar, not *-installer.jar)
+  try {
+    const rootFiles = fs.readdirSync(serverDir);
+    const forgeJar = rootFiles.find(f => /^forge-.*\.jar$/i.test(f) && !f.includes('installer'));
+    if (forgeJar) {
+      return {
+        type: 'jar',
+        target: forgeJar
+      };
+    }
+  } catch (_) {}
+
+  // 3. Fallback to server.jar
+  const serverJar = path.join(serverDir, 'server.jar');
+  if (fs.existsSync(serverJar)) {
+    return {
+      type: 'jar',
+      target: 'server.jar'
+    };
+  }
+
+  return null;
+}
+
+/**
  * Creates and sets up a new Minecraft server
  */
 export async function createServer({
@@ -245,12 +358,25 @@ export async function createServer({
 
     } else if (type.toLowerCase() === 'neoforge') {
       // NeoForge standard installer
-      const neoVersion = version.startsWith('1.20.4') ? '20.4.167' : (version.startsWith('1.21.1') ? '21.1.77' : version);
+      const neoVersion = await getNeoForgeVersion(version);
       const installerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVersion}/neoforge-${neoVersion}-installer.jar`;
-      const targetJar = path.join(serverDir, 'server.jar');
-      await downloadFile(installerUrl, targetJar, (percent) => {
-        onProgress({ stage: 'downloading', message: `Downloading NeoForge installer... (${percent}%)`, percent: 10 + Math.round(percent * 0.7) });
+      const installerJar = path.join(serverDir, 'installer.jar');
+
+      await downloadFile(installerUrl, installerJar, (percent) => {
+        onProgress({ stage: 'downloading', message: `Downloading NeoForge installer (${neoVersion})... (${percent}%)`, percent: 10 + Math.round(percent * 0.3) });
       });
+
+      onProgress({ stage: 'installing', message: `Installing NeoForge (${neoVersion}) server environment & libraries...`, percent: 50 });
+      await runJavaInstaller('java', installerJar, serverDir, (msg) => {
+        if (msg) onProgress({ stage: 'installing', message: `[NeoForge Setup] ${msg.slice(0, 80)}...`, percent: 65 });
+      });
+
+      // Cleanup installer jar
+      try {
+        if (fs.existsSync(installerJar)) fs.unlinkSync(installerJar);
+        const logFile = path.join(serverDir, 'installer.jar.log');
+        if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+      } catch (_) {}
 
     } else if (type.toLowerCase() === 'forge') {
       const FORGE_VERSION_MAP = {
@@ -263,11 +389,29 @@ export async function createServer({
       };
       const forgeVer = FORGE_VERSION_MAP[version] || `${version}-47.3.0`;
       const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVer}/forge-${forgeVer}-installer.jar`;
-      const targetJar = path.join(serverDir, 'server.jar');
+      const installerJar = path.join(serverDir, 'installer.jar');
 
-      await downloadFile(installerUrl, targetJar, (percent) => {
-        onProgress({ stage: 'downloading', message: `Downloading Forge installer (${forgeVer})... (${percent}%)`, percent: 10 + Math.round(percent * 0.7) });
+      await downloadFile(installerUrl, installerJar, (percent) => {
+        onProgress({ stage: 'downloading', message: `Downloading Forge installer (${forgeVer})... (${percent}%)`, percent: 10 + Math.round(percent * 0.3) });
       });
+
+      onProgress({ stage: 'installing', message: `Installing Forge (${forgeVer}) server environment...`, percent: 50 });
+      await runJavaInstaller('java', installerJar, serverDir, (msg) => {
+        if (msg) onProgress({ stage: 'installing', message: `[Forge Setup] ${msg.slice(0, 80)}...`, percent: 65 });
+      });
+
+      // Cleanup installer jar
+      try {
+        if (fs.existsSync(installerJar)) fs.unlinkSync(installerJar);
+        const logFile = path.join(serverDir, 'installer.jar.log');
+        if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+      } catch (_) {}
+    }
+
+    // Resolve launch target
+    const launchTarget = findServerLaunchTarget(serverDir);
+    if (launchTarget && launchTarget.type === 'jar') {
+      serverJarName = launchTarget.target;
     }
 
     onProgress({ stage: 'configuring', message: 'Generating server configuration & EULA...', percent: 85 });

@@ -3,6 +3,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import si from 'systeminformation';
 import { fileURLToPath } from 'url';
+import { findServerLaunchTarget, runJavaInstaller } from './serverInstaller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -196,13 +197,39 @@ class ProcessManager {
       javaArgs.push(`-Xms${ramGB}G`, `-Xmx${ramGB}G`);
     }
 
-    const jarFile = config.serverJar || 'server.jar';
-    const fullJarPath = path.join(serverDir, jarFile);
-    if (!fs.existsSync(fullJarPath)) {
-      throw new Error(`サーバーバイナリ (${jarFile}) が見つかりません。サーバー作成時にダウンロードが完了していない可能性があります。`);
+    // Check launch target and auto-heal uninstalled Forge/NeoForge servers
+    let launchTarget = findServerLaunchTarget(serverDir);
+    const isModdedForgeType = ['neoforge', 'forge'].includes(config.type?.toLowerCase());
+
+    if (!launchTarget || (isModdedForgeType && launchTarget.type === 'jar' && launchTarget.target === 'server.jar')) {
+      const installerPath = fs.existsSync(path.join(serverDir, 'installer.jar'))
+        ? path.join(serverDir, 'installer.jar')
+        : (fs.existsSync(path.join(serverDir, 'server.jar')) ? path.join(serverDir, 'server.jar') : null);
+
+      if (installerPath && isModdedForgeType) {
+        this.addLog(serverId, '[CraftOS] Detected unextracted NeoForge/Forge installer. Running installer setup (this may take 1-2 minutes)...', 'INFO');
+        await runJavaInstaller(config.javaPath || 'java', installerPath, serverDir, (msg) => {
+          if (msg) this.addLog(serverId, `[Installer] ${msg}`, 'INFO');
+        });
+        // Clean up installer jar to prevent future installer triggers
+        try {
+          if (fs.existsSync(installerPath)) fs.unlinkSync(installerPath);
+          const logFile = path.join(serverDir, 'installer.jar.log');
+          if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+        } catch (_) {}
+      }
+      launchTarget = findServerLaunchTarget(serverDir);
     }
 
-    javaArgs.push('-jar', jarFile, 'nogui');
+    if (!launchTarget) {
+      throw new Error(`サーバーバイナリまたは起動設定が見つかりません。サーバー作成時にダウンロードが完了していない可能性があります。`);
+    }
+
+    if (launchTarget.type === 'argsFile') {
+      javaArgs.push(`@${launchTarget.target}`, 'nogui');
+    } else {
+      javaArgs.push('-jar', launchTarget.target, 'nogui');
+    }
 
     if (!instance) {
       instance = {
