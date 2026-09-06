@@ -119,19 +119,44 @@ export default function ModsView({
     }
   };
 
+  const [installedProjectIds, setInstalledProjectIds] = useState(new Set());
+
+  // Helper to check if a mod is already installed
+  const isModInstalled = (hit) => {
+    if (installedProjectIds.has(hit.id)) return true;
+    const hitSlug = (hit.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const hitTitle = (hit.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return installedMods.some((m) => {
+      const mName = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const mFile = m.fileName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return (
+        (hitSlug && (mName.includes(hitSlug) || mFile.includes(hitSlug))) ||
+        (hitTitle && (mName.includes(hitTitle) || mFile.includes(hitTitle)))
+      );
+    });
+  };
+
   const handleInstallFromStore = async (hit) => {
     setInstallingId(hit.id);
     try {
-      await installModrinthMod({
+      const res = await installModrinthMod({
         serverId: activeServer.id,
         projectId: hit.id,
         loader: activeServer.type,
         folder: activeServer.type === 'paper' || activeServer.type === 'purpur' ? 'plugins' : 'mods'
       });
-      onNotify('success', 'Installed!', `${hit.title} has been downloaded and installed.`);
+
+      setInstalledProjectIds((prev) => new Set(prev).add(hit.id));
       await loadMods();
+
+      const depCount = res.dependenciesInstalled?.length || 0;
+      const depText = depCount > 0
+        ? `（前提Mod: ${res.dependenciesInstalled.join(', ')} も自動導入）`
+        : '';
+
+      onNotify('success', 'インストール完了', `${hit.title} を導入しました！${depText}`);
     } catch (err) {
-      onNotify('error', 'Install Error', err.message);
+      onNotify('error', 'インストール失敗', err.message);
     } finally {
       setInstallingId(null);
     }
@@ -159,7 +184,7 @@ export default function ModsView({
   const enabledCount = installedMods.filter(m => m.enabled).length;
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+    <div className="flex-1 p-6 overflow-y-auto min-h-0 flex flex-col gap-6">
       {/* Header & Mode Switcher */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -373,15 +398,22 @@ export default function ModsView({
 
                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
                       <span className="text-[10px] text-white/40">by {hit.author}</span>
-                      <AppleButton
-                        onClick={() => handleInstallFromStore(hit)}
-                        variant="primary"
-                        size="sm"
-                        icon={Download}
-                        loading={isInstalling}
-                      >
-                        1-Click Install
-                      </AppleButton>
+                      {isModInstalled(hit) ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold select-none shadow-sm">
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Installed</span>
+                        </div>
+                      ) : (
+                        <AppleButton
+                          onClick={() => handleInstallFromStore(hit)}
+                          variant="primary"
+                          size="sm"
+                          icon={Download}
+                          loading={isInstalling}
+                        >
+                          1-Click Install
+                        </AppleButton>
+                      )}
                     </div>
                   </div>
                 );

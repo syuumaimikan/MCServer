@@ -106,7 +106,7 @@ export default function WorldsView({
   };
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+    <div className="flex-1 p-6 overflow-y-auto min-h-0 flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-white/10">
         <div className="flex items-center gap-3">

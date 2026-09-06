@@ -102,7 +102,7 @@ export default function DashboardView({
   const motdParts = parseMotd(activeServer.motd || 'A Minecraft Server managed by CraftOS');
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+    <div className="flex-1 p-6 overflow-y-auto min-h-0 flex flex-col gap-6">
       {/* Top Hero Banner */}
       <div className="relative rounded-3xl p-6 glass-panel border border-white/15 overflow-hidden shadow-apple-lg">
         {/* Ambient background glow */}

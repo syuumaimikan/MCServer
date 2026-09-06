@@ -15,7 +15,7 @@ export default function AppleCard({
     <div
       onClick={onClick}
       className={clsx(
-        'glass-card rounded-2xl p-5 border border-white/10 relative overflow-hidden',
+        'glass-card rounded-2xl p-5 border border-white/10 relative shrink-0',
         hoverable && 'cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:border-white/20 active:scale-[0.99]',
         className
       )}

@@ -193,7 +193,7 @@ export default function App() {
       />
 
       {/* Main Container: Sidebar + Active View */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar
           servers={servers}
           activeServer={activeServer}
@@ -210,7 +210,7 @@ export default function App() {
           isActionLoading={isActionLoading}
         />
 
-        <main className="flex-1 flex flex-col bg-gradient-to-br from-[#12141c] to-[#0c0e13] overflow-hidden relative">
+        <main className="flex-1 flex flex-col bg-gradient-to-br from-[#12141c] to-[#0c0e13] overflow-hidden min-h-0 relative">
           {activeTab === 'dashboard' && (
             <DashboardView
               activeServer={activeServer}

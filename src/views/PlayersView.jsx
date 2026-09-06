@@ -79,7 +79,7 @@ export default function PlayersView({
   const isRunning = serverState?.status === 'RUNNING';
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+    <div className="flex-1 p-6 overflow-y-auto min-h-0 flex flex-col gap-6">
       {/* Top Header & Navigation */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-white/10">
         <div className="flex items-center gap-3">
