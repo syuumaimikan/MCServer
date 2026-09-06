@@ -333,6 +333,47 @@ export async function executeCrashRepairAction(serverId, action, payload = {}) {
   return res.json();
 }
 
+// --- UPnP Auto Port Forwarding ---
+export async function fetchUPnPStatus() {
+  const res = await fetch(`${API_BASE}/network/upnp/status`);
+  if (!res.ok) throw new Error('Failed to fetch UPnP status');
+  return res.json();
+}
+
+export async function openUPnPPort(port, protocol = 'TCP', description = 'Minecraft Server') {
+  const res = await fetch(`${API_BASE}/network/upnp/open`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port, protocol, description })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to open port via UPnP');
+  }
+  return res.json();
+}
+
+export async function closeUPnPPort(port, protocol = 'TCP') {
+  const res = await fetch(`${API_BASE}/network/upnp/close`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port, protocol })
+  });
+  if (!res.ok) throw new Error('Failed to close port via UPnP');
+  return res.json();
+}
+
+// --- Client Modpack Distribution ---
+export async function fetchModpackShareInfo(serverId) {
+  const res = await fetch(`${API_BASE}/servers/${serverId}/modpack-share`);
+  if (!res.ok) throw new Error('Failed to fetch modpack share info');
+  return res.json();
+}
+
+export function getClientPackDownloadUrl(serverId) {
+  return `${API_BASE}/servers/${serverId}/download-client-pack`;
+}
+
 /**
  * WebSocket manager
  */

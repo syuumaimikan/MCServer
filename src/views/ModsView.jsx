@@ -10,11 +10,14 @@ import {
   Sparkles,
   Layers,
   FolderOpen,
-  Filter
+  Filter,
+  Package,
+  Share2
 } from 'lucide-react';
 import AppleButton from '../components/common/AppleButton';
 import AppleToggle from '../components/common/AppleToggle';
 import AppleCard from '../components/common/AppleCard';
+import ModShareModal from '../components/ModShareModal';
 import {
   fetchInstalledMods,
   toggleModState,
@@ -50,6 +53,7 @@ export default function ModsView({
     { label: 'Adventure', query: 'adventure' }
   ];
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Load installed mods
   const loadMods = async () => {
@@ -170,29 +174,40 @@ export default function ModsView({
           </div>
         </div>
 
-        {/* Apple Segmented Control */}
-        <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/10 text-xs">
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab('installed')}
-            className={`px-4 py-1.5 rounded-xl font-semibold transition-all ${
-              activeTab === 'installed'
-                ? 'bg-apple-blue text-white shadow-apple-sm'
-                : 'text-white/60 hover:text-white'
-            }`}
+            onClick={() => setIsShareModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-semibold text-xs border border-amber-500/30 transition"
           >
-            Installed ({installedMods.length})
+            <Package className="w-3.5 h-3.5 text-amber-400" />
+            <span>友達にModを配布</span>
           </button>
-          <button
-            onClick={() => setActiveTab('store')}
-            className={`px-4 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'store'
-                ? 'bg-apple-blue text-white shadow-apple-sm'
-                : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Modrinth Store
-          </button>
+
+          {/* Apple Segmented Control */}
+          <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/10 text-xs">
+            <button
+              onClick={() => setActiveTab('installed')}
+              className={`px-4 py-1.5 rounded-xl font-semibold transition-all ${
+                activeTab === 'installed'
+                  ? 'bg-apple-blue text-white shadow-apple-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              Installed ({installedMods.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('store')}
+              className={`px-4 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'store'
+                  ? 'bg-apple-blue text-white shadow-apple-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Modrinth Store
+            </button>
+          </div>
         </div>
       </div>
 
@@ -375,6 +390,14 @@ export default function ModsView({
           )}
         </div>
       )}
+
+      {/* Modpack Share & Download Modal */}
+      <ModShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        serverId={activeServer?.id}
+        onToast={(t) => onNotify(t.type || 'info', t.title, t.message)}
+      />
     </div>
   );
 }

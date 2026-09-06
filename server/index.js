@@ -70,6 +70,9 @@ import {
   executeCrashRepair
 } from './crashAnalyzer.js';
 
+import { upnpManager } from './upnpManager.js';
+import { createClientModpackZip, getModpackShareInfo } from './modpackExporter.js';
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -613,6 +616,50 @@ app.post('/api/servers/:id/crash-repair', async (req, res) => {
     if (!action) return res.status(400).json({ error: 'Repair action is required' });
     const result = await executeCrashRepair(req.params.id, action, payload || {});
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- UPnP Auto Port Forwarding API ---
+app.get('/api/network/upnp/status', (req, res) => {
+  res.json(upnpManager.getStatus());
+});
+
+app.post('/api/network/upnp/open', async (req, res) => {
+  try {
+    const { port, protocol, description } = req.body;
+    const result = await upnpManager.openPort(Number(port) || 25565, protocol || 'TCP', description || 'Minecraft Server (CraftOS)');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/network/upnp/close', async (req, res) => {
+  try {
+    const { port, protocol } = req.body;
+    const result = await upnpManager.closePort(Number(port) || 25565, protocol || 'TCP');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Client Modpack Distribution & Export API ---
+app.get('/api/servers/:id/download-client-pack', (req, res) => {
+  try {
+    createClientModpackZip(req.params.id, res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/servers/:id/modpack-share', (req, res) => {
+  try {
+    const host = req.headers.host || 'localhost:3001';
+    const info = getModpackShareInfo(req.params.id, host);
+    res.json(info);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
