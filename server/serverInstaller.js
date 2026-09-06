@@ -251,6 +251,23 @@ export async function createServer({
       await downloadFile(installerUrl, targetJar, (percent) => {
         onProgress({ stage: 'downloading', message: `Downloading NeoForge installer... (${percent}%)`, percent: 10 + Math.round(percent * 0.7) });
       });
+
+    } else if (type.toLowerCase() === 'forge') {
+      const FORGE_VERSION_MAP = {
+        '1.20.1': '1.20.1-47.3.0',
+        '1.19.4': '1.19.4-45.2.0',
+        '1.19.2': '1.19.2-43.3.0',
+        '1.18.2': '1.18.2-40.2.0',
+        '1.16.5': '1.16.5-36.2.39',
+        '1.12.2': '1.12.2-14.23.5.2860'
+      };
+      const forgeVer = FORGE_VERSION_MAP[version] || `${version}-47.3.0`;
+      const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVer}/forge-${forgeVer}-installer.jar`;
+      const targetJar = path.join(serverDir, 'server.jar');
+
+      await downloadFile(installerUrl, targetJar, (percent) => {
+        onProgress({ stage: 'downloading', message: `Downloading Forge installer (${forgeVer})... (${percent}%)`, percent: 10 + Math.round(percent * 0.7) });
+      });
     }
 
     onProgress({ stage: 'configuring', message: 'Generating server configuration & EULA...', percent: 85 });

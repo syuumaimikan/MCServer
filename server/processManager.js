@@ -197,6 +197,11 @@ class ProcessManager {
     }
 
     const jarFile = config.serverJar || 'server.jar';
+    const fullJarPath = path.join(serverDir, jarFile);
+    if (!fs.existsSync(fullJarPath)) {
+      throw new Error(`サーバーバイナリ (${jarFile}) が見つかりません。サーバー作成時にダウンロードが完了していない可能性があります。`);
+    }
+
     javaArgs.push('-jar', jarFile, 'nogui');
 
     if (!instance) {
